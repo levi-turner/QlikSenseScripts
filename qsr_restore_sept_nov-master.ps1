@@ -10,6 +10,7 @@
 #								Elevate a specified user
 # 				User Inputs required:
 #								Run Qlik Cli install manually
+#                               Have a .TAR located on the Root of the C drive
 #   Version     Date        Author          Change Notes
 #   0.1         2017-12-20  Levi Turner     Initial Version
 #   0.2         2017-12-20  Levi Turner     Switched to Get-Service method for service start / stop over net start / stop
@@ -18,8 +19,14 @@
 #                                           Qlik Cli invocation to handle creating the user record
 #   0.5         2018-01-02  Levi Turner     Added pauses. Clean run through
 #   0.6         2018-01-10  Levi Turner     If-Exists checks / Sept/Nov Toggle
+#   0.8         2018-02-28  Levi Turner     Implemented the direct QRS call (adds support for Forms auth on default VP)
+#   0.9         2018-02-28  Levi Turner     Cleaned up the QRS initialization logic to search for .LOG rather than hardcoded number
 # TODO:
-#   Toggle Internal (copy) vs. External (wget / build)
+#   Toggle Internal (copy) vs. External (wget / build) [Long-term]
+#   Remove previously staged files (Remove-Item .\foo.bar -Force)
+#   Remove the .pgpass method (https://github.com/braathen/qlik-snapshot/blob/master/Qlik-Snapshot.psm1 seems to imply another way)
+#   Handle versions better to extend support into 2018 release
+#       With this enhancement; consolodate June and Sept/Nov scripts
 #------------------------------------------------------------------------------------
 
 # Stage the install files locally
@@ -27,19 +34,26 @@ Set-Location /
 if (Test-Path C:\Temp) {
      Write-Output "C:\Temp already exists."
 } else {
-  mkdir Temp
+    Write-Output "Creating Temp directory for staging files"
+    mkdir Temp
 }
 
 # Toggle between September / November 
 $QSVersion = Read-Host -Prompt 'Input Qlik Sense Build (e.g. 09/11)'
 
 # wget https://da3hntz84uekx.cloudfront.net/QlikSense/11.24/0/_MSI/Qlik_Sense_setup.exe -OutFile Qlik_Sense_setup.exe
+
+# Grab relevant version of Qlik Sense
+
 if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
     Write-Output "Qlik Sense already downloaded."
 } else {
-  Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\2017-$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
+    Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\2017-$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
+    Write-Output "Qlik_Sense_setup.exe staged"
 }
-if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
+
+
+if (Test-Path C:\temp\spc.cfg) {
     Write-Output "Qlik Sense SPC Config present."
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\spc.cfg" C:\temp\spc.cfg
@@ -52,14 +66,11 @@ if (Get-Module -ListAvailable -Name Qlik-Cli) {
     Set-Location Temp
 
     Write-Output "Explorer will launch, run install_qlik_cli.ps1"
-    Write-Output "Press any key to continue..."
-
-    $x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+    Read-Host "Press enter to continue with Qlik-CLI installation"
     
     explorer C:\temp
 
-    Write-Output "Press any key after install_qlik_cli.ps1 is installed"
-    $x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+    Read-Host "Press any key after install_qlik_cli.ps1 is installed"
 }
 
 Set-Location C:\Temp
@@ -69,9 +80,6 @@ Unblock-File .\Qlik_Sense_setup.exe
 Start-Process .\Qlik_Sense_setup.exe "-s userwithdomain=domain\Administrator userpassword=Password123! dbpassword=Password123! sharedpersistenceconfig=C:\Temp\spc.cfg skipstartservices=1" -wait
 
  Write-Output "Qlik Sense Installed"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
 
 # Start the Repo DB for .SQLs
 
@@ -95,12 +103,9 @@ $RootDir = get-childitem C:\
 $TarList = $RootDir | where {$_.extension -eq ".tar"}
 $TarList | format-table name
 Start-Process .\pg_restore.exe "--host localhost --port 4432 --username postgres --dbname QSR c:\$TarList" -Wait
-# Old Start-Process .\pg_restore.exe "--host localhost --port 4432 --username postgres --dbname QSR c:\QSR_backup.tar" -Wait
 
  Write-Output "Repository DB Restored"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+ Read-Host "Press Enter to continue"
 
 
 # TO DO: build the script without dependencies
@@ -119,22 +124,19 @@ if (Test-Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\service
     Write-Output "servicecluster.sql already exists."
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\servicecluster.sql" "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\servicecluster.sql"
+    Write-Output "Service Cluster Injection SQL staged"
 }
-Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f repro_elevation.sql"
+Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f servicecluster.sql"
 
- Write-Output "Share path injected"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+ Write-Output "Service Cluster injected"
+ Read-Host "Press Enter to continue"
 
 # Restore the hostname
 Set-Location C:\"Program Files"\Qlik\Sense\Repository
 Start-Process  .\Repository.exe  "-bootstrap -standalone -restorehostname" -Wait
 
  Write-Output "Bootstrap run"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+ Read-Host "Press Enter to continue"
 
 # Start services to go into the QMC to create the user record
 # TODO: Can this be handled via an API call to create a user?
@@ -145,35 +147,42 @@ Get-Service QlikSenseProxyService -ComputerName localhost | Start-Service
 # Loop until the Repo is fully online
 Set-Location C:\ProgramData\Qlik\Sense\Log\Repository\Trace
 
-Do {
-    
-    if($loglist -eq 6) {"Repository Initialized"}
-    else{
-    start-sleep 1
-    $loglist = Get-ChildItem | Measure-Object | %{$_.Count}
-    }
-}
-Until($loglist -eq 6)
+$loglist = 10
 
+# Loop until there are no .LOG files which is a signal that the Repo is online
+# since the Repo will archive them when it is fully initialized
+    Do {
+        
+        if($loglist -eq 0) {"Repository Initialized"}
+        else{
+        "Repository Still Initializing"
+        start-sleep 5
+        $loglist = Get-ChildItem -Recurse -Include *.log| Measure-Object | %{$_.Count}
+        }
+    }
+    Until($loglist -eq 0)
+
+# Artificial Sleep to prevent failure on the Qlik CLI call
+start-sleep 10
 # Call Qlik Cli to create the user record
 
 # Connect-Qlik -computername qlikserver1.domain.local -UseDefaultCredentials
 
 $myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
 $myFQDN = $myFQDN.ToLower()
-Connect-Qlik -computername $myFQDN -UseDefaultCredentials
+# Connect-Qlik -computername $myFQDN -UseDefaultCredentials
+Connect-Qlik -computername https://$($myFQDN):4242 -Username DOMAIN\Administrator
 
 
  Write-Output "Account created in QSR"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+ Read-Host "Press Enter to continue"
 
 # Elevation conditional
 if (Test-Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\repro_elevation.sql") {
-    Write-Output "servicecluster.sql already exists."
+    Write-Output "repro_elevation.sql already exists."
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\repro_elevation.sql" "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\repro_elevation.sql"
+    Write-Output "User elevation SQL staged"
 }
 
 Set-Location C:\"Program Files"\Qlik\Sense\Repository\PostgreSQL\9.6\bin
@@ -181,9 +190,7 @@ Set-Location C:\"Program Files"\Qlik\Sense\Repository\PostgreSQL\9.6\bin
 Start-Process .\psql.exe "-h localhost -p 4432 -U postgres -d QSR -e -f repro_elevation.sql" -Wait
 
  Write-Output "Account elevated"
- Write-Output "Press any key to continue..."
-
-$x = $host.UI.RawUI.ReadKey("No Write-Output,IncludeKeyDown")
+ Read-Host "Press Enter to continue"
 
 # Cycle services to flush Repo cache
 # Stop Services
