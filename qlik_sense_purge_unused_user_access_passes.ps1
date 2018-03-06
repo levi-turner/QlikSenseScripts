@@ -6,6 +6,7 @@
 # 					
 #   Version     Date        Author          Change Notes
 #   0.1         2018-01-30  Levi Turner     Initial Version
+#   0.2         2018-03-06  Levi Turner     createdDate > lastUsed
 #
 #--------------------------------------------------------------------------------------------------------------------------------
 
@@ -39,4 +40,4 @@ function Remove-QlikUserAccessType {
   }
 }
 
-Get-QlikUserAccessType -filter "createdDate lt '$inactive'" -full | Remove-QlikUserAccessType
+Get-QlikUserAccessType -filter "lastUsed lt '$inactive'" -full # | Remove-QlikUserAccessType
