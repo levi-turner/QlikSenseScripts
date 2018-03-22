@@ -1,11 +1,12 @@
 #--------------------------------------------------------------------------------------------------------------------------------
 #
-# Script Name: qlik_sense_qrs_generic-POST.ps1
-# Description: Example of how to make a POST RESTful QRS API call without dependencies
-# Dependency: Qlik-Cli None
+# Script Name: qlik_sense_qrs_generic-GET.ps1
+# Description: Example of how to make a GET RESTful QRS API call without dependencies
+# Dependency: None
 # 
 #   Version     Date        Author          Change Notes
-#   0.1         2018-03-10  Levi Turner     Initial Version
+#   0.1         2018-03-10  Levi Turner     Initial Version 
+#                                           (Adapted heavily from others e.g. Damien Villaret, Youness Ghanim)
 #   0.2         2018-03-15  Levi Turner     Added TLS 1.2 only support
 # 
 #--------------------------------------------------------------------------------------------------------------------------------
@@ -15,7 +16,7 @@
 $hdrs = @{}
 # Add in the Xrfkey value to the headers
 # https://help.qlik.com/en-US/sense-developer/February2018/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-Connect-API-Using-Xrfkey-Headers.htm
-$hdrs.Add("X-Qlik-Xrfkey","12345678qwertyui")
+$hdrs.Add("X-Qlik-Xrfkey","examplexrfkey123")
 # Add in the User account to the headers
 <# 
 Any account with sufficient permissions work
