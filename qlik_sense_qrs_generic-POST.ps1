@@ -35,4 +35,4 @@ $myFQDN = $myFQDN.ToLower()
 $body = ''
 # Handle TLS 1.2 only environments
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12' 
-Invoke-RestMethod -Uri "https://$($myFQDN):4242/qrs/failover/tonode/GUID?xrfkey=12345678qwertyui" -Method Post -Body $body -Headers $hdrs -ContentType 'application/json' -Certificate $cert
+Invoke-RestMethod -Uri "https://$($myFQDN):4242/qrs/failover/tonode/GUID?xrfkey=examplexrfkey123" -Method Post -Body $body -Headers $hdrs -ContentType 'application/json' -Certificate $cert
