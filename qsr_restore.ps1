@@ -29,7 +29,8 @@
 #   0.94        2018-03-04  Levi Turner     Removed repro_elevation.sql dependency
 #   1.0         2018-03-09  Levi Turner     Removed .pgpass dependency (using $env:PGPASSWORD = 'Password123!')
 #                                           More obvious logging
-#
+#   1.1         2018-04-12  Levi Turner     Support for April (QLIK-87603 is a blocker here)
+#                                           Even more logging
 # TODO:
 #
 #   Toggle Internal (copy) vs. External (wget / build) [Long-term]
@@ -47,8 +48,7 @@ if (Test-Path C:\Temp) {
     mkdir Temp
 }
 
-# Toggle between June / Sept / Nov / Feb (untested)
-# Undocumented 3.2
+# Toggle between June / Sept / Nov / Feb / April 
 Write-Host "Next you will enter the Qlik Sense Version" -ForegroundColor Green
 Write-Host "Enter the version in YYYY-MM format" -ForegroundColor Green
 $QSVersion = Read-Host -Prompt 'Input Qlik Sense Build (e.g. 2017-06)'
@@ -58,21 +58,11 @@ if ($($QSVersion) -eq '2017-06') {
 } elseif ($($QSVersion) -eq '2017-09') {Write-Host "This script will now silently install Sept 2017" -ForegroundColor Green}
   elseif ($($QSVersion) -eq '2017-11') {Write-Host "This script will now silently install Nov 2017" -ForegroundColor Green}
   elseif ($($QSVersion) -eq '2018-02') {Write-Host "This script will now silently install Feb 2018" -ForegroundColor Green}
+  elseif ($($QSVersion) -eq '2018-04') {Write-Host "This script will now silently install April 2018" -ForegroundColor Green }
   else 
     {Write-Host "Invalid/Unsupported build" -ForegroundColor Green
     exit
     }
-
-# wget https://da3hntz84uekx.cloudfront.net/QlikSense/11.24/0/_MSI/Qlik_Sense_setup.exe -OutFile Qlik_Sense_setup.exe
-
-# Grab relevant version of Qlik Sense
-
-if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
-    Write-Host "Qlik Sense already downloaded." -ForegroundColor Green
-} else {
-    Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
-    Write-Host "Qlik_Sense_setup.exe staged" -ForegroundColor Green
-}
 
 # Unimplemented external support
 # switch ($QSVersion)
@@ -90,13 +80,21 @@ if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
 #     Invoke-WebRequest https://da3hntz84uekx.cloudfront.net/QlikSense/$build/0/_MSI/Qlik_Sense_setup.exe -OutFile C:\temp\Qlik_Sense_setup.exe
 #     Write-Host "Qlik_Sense_setup.exe staged"
 # }
-
+# Copy the selected version of Qlik Sense to the staging path
+if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
+    Write-Host "Qlik Sense already downloaded." -ForegroundColor Green
+} else {
+    Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
+    Write-Host "Qlik_Sense_setup.exe staged" -ForegroundColor Green
+}
+# Copy the preconfigured Shared Persistence config to the staging path
 if (Test-Path C:\temp\spc.cfg) {
     Write-Host "Qlik Sense SPC Config present." -ForegroundColor Green
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\spc.cfg" C:\temp\spc.cfg
 }
-
+# Check whether Qlik CLI is installed, prompt the user to install it if it isn't installed
+# I've not had any luck with installing the Module in-line
 if (Get-Module -ListAvailable -Name Qlik-Cli) {
     Write-Host "Qlik-Cli installed " -ForegroundColor Green
 } else {
@@ -115,26 +113,12 @@ Set-Location C:\Temp
 # Unblock the EXE, usually unneeded
 Unblock-File .\Qlik_Sense_setup.exe
 # Silent install > do not start services
+Write-Host "Qlik Sense $($QSVersion) will be installed" -ForegroundColor Green
 Start-Process .\Qlik_Sense_setup.exe "-s userwithdomain=domain\Administrator userpassword=Password123! dbpassword=Password123! sharedpersistenceconfig=C:\Temp\spc.cfg skipstartservices=1" -wait
-
 Write-Host "Qlik Sense Installed" -ForegroundColor Green
 
 # Start the Repo DB for .SQLs
-
 Get-Service QlikSenseRepositoryDatabase -ComputerName localhost | Start-Service
-#Set-Location $env:APPDATA
-#if (Test-Path $env:APPDATA\postgresql) {
-#    Write-Host "postgresql directory already exists."
-#} else {
-#    mkdir postgresql
-#}
-#Set-Location $env:APPDATA\postgresql
-#if (Test-Path $env:APPDATA\postgresql\pgpass.conf) {
-#    Write-Host ".pgpass already exists."
-#} else {
-#    Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\pgpass.conf" $env:APPDATA\postgresql\pgpass.conf
-#    Write-Host ".pgpass copied"
-#}
 
 Set-Location "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\"
 # This will start up a new window, which inherits the password defined in the pgpass.conf copied above
@@ -142,11 +126,11 @@ $env:PGPASSWORD = 'Password123!';
 $RootDir = get-childitem C:\
 $TarList = $RootDir | where {$_.extension -eq ".tar"}
 $TarList | format-table name
+# Restore the database
+Write-Host "Begin restoration of the Repository Database" -ForegroundColor Green
 Start-Process .\pg_restore.exe "--host localhost --port 4432 --username postgres --dbname QSR c:\$TarList" -Wait
-
-Write-Host "Repository DB Restored" -ForegroundColor Green
+Write-Host "Repository Database Restored" -ForegroundColor Green
 Read-Host "Press Enter to continue"
-
 
 # TO DO: build the script without dependencies
 # servicecluster.sql
@@ -166,6 +150,7 @@ if (Test-Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\service
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\servicecluster.sql" "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\servicecluster.sql"
     Write-Host "Service Cluster Injection SQL staged" -ForegroundColor Green
 }
+Write-Host "Begin injection of the Service Cluster to Support paths" -ForegroundColor Green
 Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f servicecluster.sql"
 
 Write-Host "Service Cluster injected" -ForegroundColor Green
@@ -202,6 +187,26 @@ if ($($QSVersion) -eq '2017-06') {
         Start-Process  .\Repository.exe  "-bootstrap -standalone -restorehostname" -Wait
 
         Write-Host "Bootstrap run" -ForegroundColor Green
+        Read-Host "Press Enter to continue"
+    }
+    elseif ($($QSVersion) -eq '2018-04') {
+        Write-Host "This script will now restore the Hostname for April 2018" -ForegroundColor Green
+        Set-Location C:\"Program Files"\Qlik\Sense\Repository\PostgreSQL\9.6\bin
+        $Data = Get-Content C:\ProgramData\Qlik\Sense\Host.cfg
+        $FQDN = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($($Data)))
+
+        $elevate1 = "UPDATE `"LocalConfigs`" SET `"HostName`" = '$($FQDN)' WHERE LOWER(`"HostName`") = (SELECT `"HostName`" FROM `"ServerNodeConfigurations`" WHERE `"IsCentral`"='true')`;"
+        
+        $elevate2 = "UPDATE `"ServerNodeConfigurations`" SET `"HostName`" = '$($FQDN)' WHERE `"HostName`" = (SELECT `"HostName`" FROM `"ServerNodeConfigurations`" WHERE `"IsCentral`"='true');"
+
+        $elevate1 | set-content qs_2018-04-elevate1.sql -Encoding Ascii
+        $elevate2 | set-content qs_2018-04-elevate2.sql -Encoding Ascii
+        
+        Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f qs_2018-04-elevate1.sql"
+        start-sleep 5
+        Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f qs_2018-04-elevate2.sql"
+
+        Write-Host "LocalConfigs & ServerNodeConfigurations adjusted" -ForegroundColor Green
         Read-Host "Press Enter to continue"
     }
   else 
@@ -243,15 +248,18 @@ $myFQDN = $myFQDN.ToLower()
 # Connect-Qlik -computername $myFQDN -UseDefaultCredentials
 Connect-Qlik -computername https://$($myFQDN):4242 -Username DOMAIN\Administrator
 
+Write-Host "Account created in QSR" -ForegroundColor Green
+Read-Host "Press Enter to continue"
 
- Write-Host "Account created in QSR" -ForegroundColor Green
- Read-Host "Press Enter to continue"
-
-# Elevate the DOMAIN\Administrator account to being a RootAdmin
+# Connect as internal account to perform the elevation
 Connect-Qlik -Computername https://$($myFQDN):4242 -Username internal\sa_api
+# Elevate the DOMAIN\Administrator account to being a RootAdmin
 $ElevateUser = Get-QlikUser -filter "userdirectory eq 'DOMAIN'" -raw -full
 $ElevateUserID = $ElevateUser.ID
 Update-QlikUser -id $ElevateUserID -roles RootAdmin
+
+Write-Host "Account elevated" -ForegroundColor Green
+Read-Host "Press Enter to continue"
 
 # Elevation conditional
 # if (Test-Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\repro_elevation.sql") {
@@ -265,33 +273,23 @@ Update-QlikUser -id $ElevateUserID -roles RootAdmin
 # Begin elevating the Admin account
 # Start-Process .\psql.exe "-h localhost -p 4432 -U postgres -d QSR -e -f repro_elevation.sql" -Wait
 
- Write-Host "Account elevated" -ForegroundColor Green
- Read-Host "Press Enter to continue"
-
-# Cycling not needed since revamping elevation to use QRS API
-# #Cycle services to flush Repo cache
-# #Stop Services
-# Get-Service QlikSenseProxyService -ComputerName localhost | Stop-Service
-# Get-Service QlikSenseServiceDispatcher -ComputerName localhost | Stop-Service
-# Get-Service QlikSenseRepositoryService -ComputerName localhost | Stop-Service
-# Get-Service QlikSenseRepositoryDatabase -ComputerName localhost | Stop-Service
-# Start services
-# Get-Service QlikSenseRepositoryDatabase -ComputerName localhost | Start-Service
-# Get-Service QlikSenseRepositoryService -ComputerName localhost | Start-Service
-# Get-Service QlikSenseSchedulerService -ComputerName localhost | Start-Service
 Get-Service QlikSenseServiceDispatcher -ComputerName localhost | Start-Service
-# Get-Service QlikSenseProxyService -ComputerName localhost | Start-Service
 Get-Service QlikSensePrintingService -ComputerName localhost | Start-Service
 Get-Service QlikSenseEngineService -ComputerName localhost | Start-Service
 Get-Service QlikSenseSchedulerService -ComputerName localhost | Start-Service
 
 Write-Host "Clean up activities" -ForegroundColor Green
+if ($($QSVersion) -eq '2018-04') {
+    Remove-Item -Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\qs_2018-04-elevate1.sql" -Force
+Write-Host "qs_2018-04-elevate1.sql deleted" -ForegroundColor Green
+Remove-Item -Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\qs_2018-04-elevate2.sql" -Force
+Write-Host "qs_2018-04-elevate2.sql deleted" -ForegroundColor Green
+       }
+else 
+    {}
 Remove-Item -Path "C:\temp\Qlik_Sense_setup.exe" -Force
 Write-Host "Installer deleted" -ForegroundColor Green
 Remove-Item -Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\servicecluster.sql" -Force
 Write-Host "servicecluster.sql deleted" -ForegroundColor Green
-#Remove-Item -Path $env:APPDATA\postgresql\pgpass.conf -Force
-#Write-Host ".pgpass deleted"
-# Repository elevation no longer needed; handled via QRS API Calls
-#Remove-Item -Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\repro_elevation.sql" -Force
-#Write-Host "repro_elevation.sql deleted"
+Remove-Item -Path "C:\Temp\spc.cfg" -Force
+Write-Host "spc.cfg deleted"

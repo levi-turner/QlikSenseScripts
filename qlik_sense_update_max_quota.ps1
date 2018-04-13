@@ -48,7 +48,7 @@ $MaxQuota | % {if($_.schemaPath -eq 'AppContentQuota'){$_.maxFileSize=$maxFileSi
 
 # maxLibrarySize is total space in an app for all files
 # Unit is bytes
-$MaxQuota | % {if($_.schemaPath -eq 'AppContentQuota'){$_.maxLibrarySize='209,715,200'}}
+$MaxQuota | % {if($_.schemaPath -eq 'AppContentQuota'){$_.maxLibrarySize=$maxLibrarySizeValue}}
 
 # Convert to JSON for PUT's body
 $MaxQuota = $MaxQuota | ConvertTo-Json

@@ -32,4 +32,4 @@ $myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win3
 $myFQDN = $myFQDN.ToLower()
 # Handle TLS 1.2 only environments
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12' 
-Invoke-RestMethod -Uri "https://$($myFQDN):4242/qrs/about?xrfkey=12345678qwertyui" -Method Get -Headers $hdrs -ContentType 'application/json' -Certificate $cert
+Invoke-RestMethod -Uri "https://$($myFQDN):4242/qrs/about?xrfkey=examplexrfkey123" -Method Get -Headers $hdrs -ContentType 'application/json' -Certificate $cert
