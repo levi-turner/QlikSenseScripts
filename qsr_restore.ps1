@@ -36,7 +36,7 @@
 #   Toggle Internal (copy) vs. External (wget / build) [Long-term]
 #   Globalization?
 #   Validity checks not present
-#
+#   Add Admin rights catch on initialization (issues in Windows Server 2016)
 #------------------------------------------------------------------------------------
 
 # Stage the install files locally

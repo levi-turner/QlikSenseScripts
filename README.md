@@ -8,3 +8,4 @@
 | `qsr_restore.ps1` |  | Functional restoration of a Qlik Sense site from a .TAR backup (supports Qlik Sense June-November 2017, February 2018) |
 | `qlik_sense_qrs_generic-GET.ps1` | None | Example of how to make a GET RESTful QRS API call without dependencies |
 | `qlik_sense_qrs_generic-POST.ps1` | None | Example of how to make a POST RESTful QRS API call without dependencies |
+| `qlik_sense-compare_qmc_vs_disk.ps1` | None | Diffs the apps present in the QMC vs. the files on disk |
