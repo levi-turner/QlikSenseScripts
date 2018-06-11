@@ -17,10 +17,8 @@ $Password = Read-Host -Prompt 'Input the  new password'
 
 # Warn of service stop
 
-echo "Qlik Sense Services will now stop"
-echo "Press any key after doing so..."
-
-$x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Qlik Sense Services will now stop" -ForegroundColor Green
+Read-Host "Press Enter to continue"
 
 # Stop all Qlik Sense Services
 
@@ -43,11 +41,10 @@ sc.exe config "QlikSenseEngineService" obj= "$Username" password= "$Password"
 sc.exe config "QlikLoggingService" obj= "$Username" password= "$Password"
 sc.exe config "QlikSensePrintingService" obj= "$Username" password= "$Password"
 
-echo "Password changed"
-echo "Qlik Sense Services will now start"
-echo "Press any key after doing so..."
 
-$x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Password changed" -ForegroundColor Green
+Write-Host "Qlik Sense Services will now start" -ForegroundColor Green
+Read-Host "Press Enter to continue"
 
 Get-Service QlikSenseRepositoryDatabase -ComputerName localhost | Start-Service
 Get-Service QlikLoggingService -ComputerName localhost | Start-Service
@@ -59,15 +56,39 @@ Get-Service QlikSensePrintingService -ComputerName localhost | Start-Service
 Get-Service QlikSenseEngineService -ComputerName localhost | Start-Service
 Get-Service QlikSenseSchedulerService -ComputerName localhost | Start-Service
 
+Set-Location C:\ProgramData\Qlik\Sense\Log\Repository\Trace
+
+$loglist = 10
+
+# Loop until there are no .LOG files which is a signal that the Repo is online
+# since the Repo will archive them when it is fully initialized
+    Do {
+        
+        if($loglist -eq 0) {"Repository Initialized"}
+        else{
+        Write-Host "Repository Still Initializing" -ForegroundColor Green
+        start-sleep 5
+        $loglist = Get-ChildItem -Recurse -Include *.log| Measure-Object | %{$_.Count}
+        }
+    }
+    Until($loglist -eq 0)
+
+# Artificial Sleep to prevent failure on the Qlik CLI call
+start-sleep 50
 
 # Begin Qlik CLI work
 
 # Transform the hostname to lower for Connect-Qlik function
-$myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
-$myFQDN = $myFQDN.ToLower()
+#$myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
+#$myFQDN = $myFQDN.ToLower()
+
+# Gets the configured hostname from the host.cfg file
+$Data = Get-Content C:\ProgramData\Qlik\Sense\Host.cfg
+# Convert the base64 encoded install name for Sense to UTF data
+$FQDN = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($($Data)))
 
 # Connect to Qlik-CLI
-Connect-Qlik -ComputerName https://$($myFQDN):4242 -Username INTERNAL\sa_api
+Connect-Qlik -ComputerName https://$($FQDN):4242 -Username INTERNAL\sa_api
 
 # Begin work on the monitor_apps_REST_app data connection
 # Needed to handle the dates in the JSON responses
