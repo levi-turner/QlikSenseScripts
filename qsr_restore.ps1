@@ -31,13 +31,21 @@
 #                                           More obvious logging
 #   1.1         2018-04-12  Levi Turner     Support for April (QLIK-87603 is a blocker here)
 #                                           Even more logging
+#   1.2         2018-06-21 Levi Turner      Adding Support for 2018-06
+#                                           Adding Admin right catch
 # TODO:
 #
 #   Toggle Internal (copy) vs. External (wget / build) [Long-term]
 #   Globalization?
 #   Validity checks not present
-#   Add Admin rights catch on initialization (issues in Windows Server 2016)
 #------------------------------------------------------------------------------------
+# Admin rights catch
+If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).
+IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+    Write-Warning "You do not have Administrator rights to run this script!`nPlease re-run this script as an Administrator!"
+    Break
+}
 
 # Stage the install files locally
 Set-Location /
@@ -55,10 +63,11 @@ $QSVersion = Read-Host -Prompt 'Input Qlik Sense Build (e.g. 2017-06)'
 
 if ($($QSVersion) -eq '2017-06') {
     Write-Host "This script will now silently install June 2017" -ForegroundColor Green
-} elseif ($($QSVersion) -eq '2017-09') {Write-Host "This script will now silently install Sept 2017" -ForegroundColor Green}
-  elseif ($($QSVersion) -eq '2017-11') {Write-Host "This script will now silently install Nov 2017" -ForegroundColor Green}
-  elseif ($($QSVersion) -eq '2018-02') {Write-Host "This script will now silently install Feb 2018" -ForegroundColor Green}
+} elseif ($($QSVersion) -eq '2017-09') {Write-Host "This script will now silently install September 2017" -ForegroundColor Green}
+  elseif ($($QSVersion) -eq '2017-11') {Write-Host "This script will now silently install November 2017" -ForegroundColor Green}
+  elseif ($($QSVersion) -eq '2018-02') {Write-Host "This script will now silently install February 2018" -ForegroundColor Green}
   elseif ($($QSVersion) -eq '2018-04') {Write-Host "This script will now silently install April 2018" -ForegroundColor Green }
+  elseif ($($QSVersion) -eq '2018-06') {Write-Host "This script will now silently install June 2018" -ForegroundColor Green }
   else 
     {Write-Host "Invalid/Unsupported build" -ForegroundColor Green
     exit
@@ -207,6 +216,14 @@ if ($($QSVersion) -eq '2017-06') {
         Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f qs_2018-04-elevate2.sql"
 
         Write-Host "LocalConfigs & ServerNodeConfigurations adjusted" -ForegroundColor Green
+        Read-Host "Press Enter to continue"
+    }
+    elseif ($($QSVersion) -eq '2018-06') {
+        Write-Host "This script will now restore the Hostname for June 2018" -ForegroundColor Green
+        Set-Location C:\"Program Files"\Qlik\Sense\Repository
+        Start-Process  .\Repository.exe  "-bootstrap -standalone -restorehostname" -Wait
+
+        Write-Host "Bootstrap run" -ForegroundColor Green
         Read-Host "Press Enter to continue"
     }
   else 

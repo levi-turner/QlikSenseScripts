@@ -8,6 +8,7 @@
 #   0.1         2018-03-10  Levi Turner     Initial Version 
 #                                           (Adapted heavily from others e.g. Damien Villaret, Youness Ghanim)
 #   0.2         2018-03-15  Levi Turner     Added TLS 1.2 only support
+#   0.3         2018-06-21  Levi Turner     Grab the hostname from the Host.cfg rather than assuming it
 # 
 #--------------------------------------------------------------------------------------------------------------------------------
 
@@ -28,8 +29,9 @@ $hdrs.Add("X-Qlik-User", "UserDirectory=INTERNAL; UserId=sa_api")
 $cert = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where {$_.Subject -like '*QlikClient*'}
 # Construct the FQDN
 # Use case is being run on the Qlik Sense Server
-$myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
-$myFQDN = $myFQDN.ToLower()
+$Data = Get-Content C:\ProgramData\Qlik\Sense\Host.cfg
+# Convert the base64 encoded install name for Sense to UTF data
+$FQDN = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($($Data)))
 # Handle TLS 1.2 only environments
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12' 
-Invoke-RestMethod -Uri "https://$($myFQDN):4242/qrs/about?xrfkey=examplexrfkey123" -Method Get -Headers $hdrs -ContentType 'application/json' -Certificate $cert
+Invoke-RestMethod -Uri "https://$($FQDN):4242/qrs/about?xrfkey=examplexrfkey123" -Method Get -Headers $hdrs -ContentType 'application/json' -Certificate $cert
