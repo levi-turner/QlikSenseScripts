@@ -33,12 +33,16 @@
 #                                           Even more logging
 #   1.2         2018-06-21 Levi Turner      Adding Support for 2018-06
 #                                           Adding Admin right catch
+#   1.3         2018-06-22 Levi Turner      Building out spc.cfg dynamically inline
+#                                           Adding catch for multiple .TARs in the Root of C (Pierce is silly)
+#
 # TODO:
 #
 #   Toggle Internal (copy) vs. External (wget / build) [Long-term]
 #   Globalization?
 #   Validity checks not present
 #------------------------------------------------------------------------------------
+
 # Admin rights catch
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).
 IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
@@ -47,16 +51,16 @@ IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
     Break
 }
 
-# Stage the install files locally
+# Ensure that the Temp directory exists
 Set-Location /
 if (Test-Path C:\Temp) {
      Write-Host "C:\Temp already exists." -ForegroundColor Green
 } else {
     Write-Host "Creating Temp directory for staging files" -ForegroundColor Green
-    mkdir Temp
+    New-Item -Name Temp -ItemType directory
 }
 
-# Toggle between June / Sept / Nov / Feb / April 
+# Toggle between June / Sept / Nov / Feb / April / June
 Write-Host "Next you will enter the Qlik Sense Version" -ForegroundColor Green
 Write-Host "Enter the version in YYYY-MM format" -ForegroundColor Green
 $QSVersion = Read-Host -Prompt 'Input Qlik Sense Build (e.g. 2017-06)'
@@ -90,22 +94,92 @@ if ($($QSVersion) -eq '2017-06') {
 #     Write-Host "Qlik_Sense_setup.exe staged"
 # }
 # Copy the selected version of Qlik Sense to the staging path
+
 if (Test-Path C:\temp\Qlik_Sense_setup.exe) {
-    Write-Host "Qlik Sense already downloaded." -ForegroundColor Green
+    Write-Host "Removing previously staged Qlik Sense installer" -ForegroundColor Green
+    Remove-Item -Path "C:\temp\Qlik_Sense_setup.exe" -Force
+    Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
+    Write-Host "Qlik_Sense_setup.exe staged" -ForegroundColor Green
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Applications\Qlik Sense\$QSVersion\Qlik_Sense_setup.exe" C:\temp\Qlik_Sense_setup.exe
     Write-Host "Qlik_Sense_setup.exe staged" -ForegroundColor Green
 }
-# Copy the preconfigured Shared Persistence config to the staging path
-if (Test-Path C:\temp\spc.cfg) {
-    Write-Host "Qlik Sense SPC Config present." -ForegroundColor Green
+
+# Create Share Path
+Set-Location -Path C:\
+
+if (Test-Path C:\QlikShare) {
+     Write-Host "C:\QlikShare already exists." -ForegroundColor Green
 } else {
-    Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\spc.cfg" C:\temp\spc.cfg
+    Write-Host "Creating QlikShare directory for Shared Persistence Storage" -ForegroundColor Green
+    New-Item -Name QlikShare -ItemType directory
 }
+# Create SMB Share
+if(!(Get-SMBShare -Name QlikShare -ea 0)){
+    New-SmbShare -Name "QlikShare" -Path "C:\QlikShare" -FullAccess "DOMAIN\Administrator" | Out-Null
+    Write-Host "Creating QlikShare SMB Share for Shared Persistence Storage" -ForegroundColor Green
+}
+
+if (Test-Path C:\temp\spc.cfg) {
+    Write-Host "Removing previously staged Shared Persistence Configuration" -ForegroundColor Green
+    Remove-Item -Path "C:\temp\spc.cfg" -Force
+} else {
+
+}
+# Create spc.cfg
+$SPShare = '\\' + $($env:computername) + '\QlikShare'
+# Set the File Name
+$filePath = "spc.cfg"
+
+# Create The Document
+$XmlWriter = New-Object System.XMl.XmlTextWriter($filePath,$Null)
+ 
+# Set The Formatting
+$xmlWriter.Formatting = "Indented"
+$xmlWriter.Indentation = "4"
+ 
+# Write the XML Decleration
+$xmlWriter.WriteStartDocument()
+ 
+# Write Root Element
+$xmlWriter.WriteStartElement("SharedPersistenceConfiguration")
+ 
+# Write the Document
+#$xmlWriter.WriteStartElement("Servers")
+$xmlWriter.WriteElementString("DbUserName","qliksenserepository")
+$xmlWriter.WriteElementString("DbUserPassword","Password123!")
+$xmlWriter.WriteElementString("DbHost","localhost")
+$xmlWriter.WriteElementString("DbPort","4432")
+$xmlWriter.WriteElementString("RootDir","$($SPShare)")
+$xmlWriter.WriteElementString("StaticContentRootDir","$($SPShare)" + "\StaticContent")
+$xmlWriter.WriteElementString("CustomDataRootDir","$($SPShare)" + "\CustomData")
+$xmlWriter.WriteElementString("ArchivedLogsDir","$($SPShare)" + "\ArchivedLogs")
+$xmlWriter.WriteElementString("AppsDir","$($SPShare)" + "\Apps")
+$xmlWriter.WriteElementString("CreateCluster","true")
+$xmlWriter.WriteElementString("InstallLocalDb","true")
+$xmlWriter.WriteElementString("ConfigureDbListener","true")
+$xmlWriter.WriteElementString("ListenAddresses","*")
+$xmlWriter.WriteElementString("IpRange","0.0.0.0/0")
+
+#$xmlWriter.WriteEndElement # <-- Closing Servers
+ 
+# Write Close Tag for Root Element
+$xmlWriter.WriteEndElement  | Out-Null # <-- Closing RootElement
+ 
+# End the XML Document
+$xmlWriter.WriteEndDocument() | Out-Null
+ 
+# Finish The Document
+$xmlWriter.Finalize | Out-Null
+$xmlWriter.Flush | Out-Null
+$xmlWriter.Close() | Out-Null
+
+Write-Host "Shared Persistence Configuration staged" -ForegroundColor Green
+
 # Check whether Qlik CLI is installed, prompt the user to install it if it isn't installed
 # I've not had any luck with installing the Module in-line
 if (Get-Module -ListAvailable -Name Qlik-Cli) {
-    Write-Host "Qlik-Cli installed " -ForegroundColor Green
+    Write-Host "Qlik-Cli is already installed " -ForegroundColor Green
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\install_qlik_cli.ps1" C:\temp\install_qlik_cli.ps1
     Set-Location Temp
@@ -130,16 +204,33 @@ Write-Host "Qlik Sense Installed" -ForegroundColor Green
 Get-Service QlikSenseRepositoryDatabase -ComputerName localhost | Start-Service
 
 Set-Location "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\"
-# This will start up a new window, which inherits the password defined in the pgpass.conf copied above
+# Set environmental variable to set postgres user password
 $env:PGPASSWORD = 'Password123!';
+
+# Catch for multiple or no .TARs in the Root of C
 $RootDir = get-childitem C:\
 $TarList = $RootDir | where {$_.extension -eq ".tar"}
-$TarList | format-table name
+$TarListCount = ( $TarList | Measure-Object ).Count;
+
+Do {
+        
+    if($($TarListCount) -ne "1") {
+        Write-Host "Please ensure that only the target .TAR exists in C:\ or that the target .TAR is in C:\" -ForegroundColor Green
+        start-sleep 5
+        $RootDir = get-childitem C:\
+        $TarList = $RootDir | where {$_.extension -eq ".tar"}
+        $TarListCount = ( $TarList | Measure-Object ).Count;
+    }
+    else{
+    }
+}
+Until($($TarListCount) -eq "1")
+
 # Restore the database
 Write-Host "Begin restoration of the Repository Database" -ForegroundColor Green
 Start-Process .\pg_restore.exe "--host localhost --port 4432 --username postgres --dbname QSR c:\$TarList" -Wait
 Write-Host "Repository Database Restored" -ForegroundColor Green
-Read-Host "Press Enter to continue"
+#Read-Host "Press Enter to continue"
 
 # TO DO: build the script without dependencies
 # servicecluster.sql
@@ -163,7 +254,7 @@ Write-Host "Begin injection of the Service Cluster to Support paths" -Foreground
 Start-Process .\psql.exe "--host localhost --port 4432 -U postgres --dbname QSR -e -f servicecluster.sql"
 
 Write-Host "Service Cluster injected" -ForegroundColor Green
-Read-Host "Press Enter to continue"
+#Read-Host "Press Enter to continue"
 
 # Restore the hostname
 
@@ -224,7 +315,7 @@ if ($($QSVersion) -eq '2017-06') {
         Start-Process  .\Repository.exe  "-bootstrap -standalone -restorehostname" -Wait
 
         Write-Host "Bootstrap run" -ForegroundColor Green
-        Read-Host "Press Enter to continue"
+        #Read-Host "Press Enter to continue"
     }
   else 
     {Write-Host "Invalid/Unsupported build" -ForegroundColor Green
@@ -263,20 +354,21 @@ start-sleep 10
 $myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
 $myFQDN = $myFQDN.ToLower()
 # Connect-Qlik -computername $myFQDN -UseDefaultCredentials
-Connect-Qlik -computername https://$($myFQDN):4242 -Username DOMAIN\Administrator
+Connect-Qlik -computername https://$($myFQDN):4242 -Username DOMAIN\Administrator | Out-Null
 
 Write-Host "Account created in QSR" -ForegroundColor Green
-Read-Host "Press Enter to continue"
+#Read-Host "Press Enter to continue"
 
 # Connect as internal account to perform the elevation
-Connect-Qlik -Computername https://$($myFQDN):4242 -Username internal\sa_api
+# TODO : Out-Null Testing
+Connect-Qlik -Computername https://$($myFQDN):4242 -Username internal\sa_api | Out-Null
 # Elevate the DOMAIN\Administrator account to being a RootAdmin
 $ElevateUser = Get-QlikUser -filter "userdirectory eq 'DOMAIN'" -raw -full
 $ElevateUserID = $ElevateUser.ID
-Update-QlikUser -id $ElevateUserID -roles RootAdmin
+Update-QlikUser -id $ElevateUserID -roles RootAdmin | Out-Null
 
 Write-Host "Account elevated" -ForegroundColor Green
-Read-Host "Press Enter to continue"
+#Read-Host "Press Enter to continue"
 
 # Elevation conditional
 # if (Test-Path "C:\Program Files\Qlik\Sense\Repository\PostgreSQL\9.6\bin\repro_elevation.sql") {
