@@ -126,10 +126,11 @@ if (Test-Path C:\temp\spc.cfg) {
 } else {
 
 }
+Set-Location -Path C:\Temp
 # Create spc.cfg
 $SPShare = '\\' + $($env:computername) + '\QlikShare'
 # Set the File Name
-$filePath = "spc.cfg"
+$filePath = "C:\Temp\spc.cfg"
 
 # Create The Document
 $XmlWriter = New-Object System.XMl.XmlTextWriter($filePath,$Null)
@@ -182,7 +183,7 @@ if (Get-Module -ListAvailable -Name Qlik-Cli) {
     Write-Host "Qlik-Cli is already installed " -ForegroundColor Green
 } else {
     Copy-Item "\\Dropzoneqvcloud\Dropzone\Private folders\LTU\automation\qsr_restore\install_qlik_cli.ps1" C:\temp\install_qlik_cli.ps1
-    Set-Location Temp
+    Set-Location C:\Temp
 
     Write-Host "Explorer will launch, run install_qlik_cli.ps1" -ForegroundColor Green
     Read-Host "Press enter to continue with Qlik-CLI installation"
