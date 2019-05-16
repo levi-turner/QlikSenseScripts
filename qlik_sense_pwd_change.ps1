@@ -36,7 +36,7 @@ function LoacateQlikCli {
     } else {
         $ScriptPath = $PSScriptRoot
     }
-    // Search possible subdirectories for Qlik-Cli
+    # Search possible subdirectories for Qlik-Cli
     $SubDirs = "Qlik-Cli", "Qlik-Cli-master"
     foreach ($SubDir in $SubDirs) {
         $Path = "$ScriptPath\$SubDir\"
