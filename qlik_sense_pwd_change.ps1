@@ -8,7 +8,9 @@
 #   0.1         2018-01-04  Levi Turner     Initial Version
 #   0.2         2018-01-19  Levi Turner     Validation
 #   0.2         2018-06-20  Levi Turner     Adding Admin rights catch + loop for QRS uptime
-#   0.3         2019-05-13  Vegard Bakke    Allow updating only services or connectsion, support new REST connections
+#   0.3         2019-05-13  Vegard Bakke    Allow updating only services or connection, 
+#                                           support new REST connections, 
+#                                           support local Qlik-Cli module from a subdirectory
 #
 #--------------------------------------------------------------------------------------------------------------------------------
 
@@ -27,6 +29,29 @@ if (-not $Services -and -not $Connections) {
     $Connections = $true;
 }
 
+
+function LoacateQlikCli {
+    if ($psISE) {
+        $ScriptPath = Split-Path -Path $psISE.CurrentFile.FullPath        
+    } else {
+        $ScriptPath = $PSScriptRoot
+    }
+    // Search possible subdirectories for Qlik-Cli
+    $SubDirs = "Qlik-Cli", "Qlik-Cli-master"
+    foreach ($SubDir in $SubDirs) {
+        $Path = "$ScriptPath\$SubDir\"
+        Write-Host TESTING "$Path\Qlik-Cli.psd1"
+        if(Test-Path -Path "$Path\Qlik-Cli.psd1") {
+            Write-Host "Found Qlik-Cli module in dir '$SubDir'"
+            return "$Path"
+        }
+    }
+    Write-Host "No local Qlik-Cli module found. Trying global"
+    return "QlikCli"
+}
+
+
+
 # Admin catch
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).
 IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
@@ -38,15 +63,9 @@ IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
 Write-Host "Running as: " $(whoami)
 
 # Import Qlik-Cli and test that it exists
-if(Test-Path -Path "$PSScriptRoot\Qlik-Cli\Qlik-Cli.psd1") {
-    # If Qlik-Cli exists as a sub folder, import that
-    Write-Host "Importing local Qlik-Cli module"
-    Import-Module $PSScriptRoot\Qlik-Cli\Qlik-Cli
-} else {
-    # If not, try if package is installed globally
-    Write-Host "Importing global Qlik-Cli module"
-    Import-Module Qlik-Cli
-}
+$QlikCliPath = LoacateQlikCli
+Write-Host "Importing: ${QlikCliPath}Qlik-Cli"
+Import-Module "${QlikCliPath}Qlik-Cli"
 if (-not (Get-Module -Name "Qlik-Cli")) {
     Write-Warning "Cannot find the module Qlik-Cli"
     Write-Host "This module is required for interacting with the Qlik Server and can be downloaded from:"
@@ -133,7 +152,6 @@ if ($Services) {
     }
     Until($loglist -eq 0)
 }
-
 
 
 
