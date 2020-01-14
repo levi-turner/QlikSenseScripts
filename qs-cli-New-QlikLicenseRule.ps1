@@ -1,6 +1,6 @@
 #Requires -Modules Qlik-Cli
 Connect-Qlik
-function New-QlikLicenseRule {
+function New-QlikAnalyzerLicenseRule {
 [CmdletBinding()]
 param (
 [parameter(ValueFromPipeline=$true)]

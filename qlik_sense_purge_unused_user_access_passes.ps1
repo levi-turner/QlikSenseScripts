@@ -10,8 +10,9 @@
 #
 #--------------------------------------------------------------------------------------------------------------------------------
 
-$InactivityThreshold = Read-Host -Prompt 'Input the username date threshold for inactivity (e.g. 90)'
+#Requires -Modules Qlik-Cli
 
+$InactivityThreshold = Read-Host -Prompt 'Input the username date threshold for inactivity (e.g. 90)'
 
 # Get date format for 90 days ago
 $date = Get-Date
@@ -21,12 +22,8 @@ $time = Get-Date
 $time = $time.GetDateTimeFormats()[109]
 $inactive = $date + ' ' + $time
 
-# Connect to Qlik Sense
-$myFQDN=(Get-WmiObject win32_computersystem).DNSHostName+"."+(Get-WmiObject win32_computersystem).Domain
-$myFQDN = $myFQDN.ToLower()
-
 # Connect to Qlik-CLI
-Connect-Qlik -ComputerName $($myFQDN) 
+Connect-Qlik
 
 function Remove-QlikUserAccessType {
   [CmdletBinding()]
@@ -40,4 +37,4 @@ function Remove-QlikUserAccessType {
   }
 }
 
-Get-QlikUserAccessType -filter "lastUsed lt '$inactive'" -full # | Remove-QlikUserAccessType
+Get-QlikUserAccessType -filter "lastUsed lt '$inactive'" -full | Remove-QlikUserAccessType
