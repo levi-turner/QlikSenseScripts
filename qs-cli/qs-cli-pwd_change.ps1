@@ -22,8 +22,10 @@ IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
 
 # Get new inputs
 
-$Username = Read-Host -Prompt 'Input the username (DOMAIN\USERID format)'
-$Password = Read-Host -Prompt 'Input the  new password'
+$Credential = Get-Credential
+
+$Username = $Credential.UserName
+$Password = $Credential.GetNetworkCredential().Password
 
 # Warn of service stop
 
