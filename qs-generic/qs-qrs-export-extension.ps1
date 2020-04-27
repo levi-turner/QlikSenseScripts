@@ -1,3 +1,6 @@
+$exportPath = 'C:\tmp'
+$virtualProxyPrefix = '' # if the prefixless virtual proxy does not use Windows authentication, define the prefix for the virtual proxy which does Windows auth e.g. /windows
+
 # GET a list of extensions
 $hdrs = @{}
 $hdrs.Add("X-Qlik-Xrfkey","examplexrfkey123")
