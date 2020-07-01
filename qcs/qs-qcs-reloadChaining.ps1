@@ -42,7 +42,7 @@ if (((Get-Date).Hour -eq $hourOfDay) -and ((Get-Date).Minute -eq $minuteOfHour))
             # Poll every 10 seconds to see if the reload has completed.
             # Valid status values are CREATED, QUEUED, RELOADING, SUCCEEDED, FAILED
             do {
-                $reloadStatus = Invoke-RestMethod -Uri "https://$($tenant)/api/v1/reloads/$($request.id)" -Method Get -Headers $
+                $reloadStatus = Invoke-RestMethod -Uri "https://$($tenant)/api/v1/reloads/$($request.id)" -Method Get -Headers $hdrs
                 Start-Sleep -Seconds 10
             } until ($reloadStatus.status -eq 'SUCCEEDED' -or $reloadStatus.status -eq 'FAILED')
             # Log on success
