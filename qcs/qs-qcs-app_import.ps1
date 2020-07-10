@@ -10,7 +10,7 @@ $hdrs = @{}
 $hdrs.Add("Authorization","Bearer $($apikey)")
 # Many thanks to https://stackoverflow.com/questions/36268925/powershell-invoke-restmethod-multipart-form-data
 # Read the file
-$filePath = 'C:\Users\ltu\Downloads\foo.qvf';
+$filePath = 'C:\Temp\Random Data.qvf';
 
 # Parse out the filename
 $FileName = Split-Path $filePath -leaf
@@ -25,7 +25,7 @@ $hdrs.Add("Content-Type","application/octet-stream")
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]'Ssl3,Tls,Tls11,Tls12'
 
 # Send the file to QCS
-$app = Invoke-RestMethod -Uri "https://$($tenant)/api/v1/apps/import?fallbackName=$FileName" -ContentType "application/octet-stream"  -Method Post -Headers $hdrs -InFile 'C:\Users\ltu\Downloads\foo.qvf'
+$app = Invoke-RestMethod -Uri "https://$($tenant)/api/v1/apps/import?fallbackName=$FileName" -ContentType "application/octet-stream"  -Method Post -Headers $hdrs -InFile $filePath
 
 # Construct the body of the items entity that we're creating from the response
 $appbody = '{
@@ -42,6 +42,9 @@ $appbody += $app.attributes.name
 $appbody += '",
         "ownerId": "'
 $appbody += $app.attributes.ownerId
+$appbody += '", 
+        "thumbnail" : "'
+$appbody += $app.attributes.thumbnail
 $appbody += '"
     },
     "resourceType": "app",
