@@ -103,14 +103,14 @@ $Data = Get-Content C:\ProgramData\Qlik\Sense\Host.cfg
 $FQDN = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($($Data)))
 
 # Connect to Qlik-CLI
-
+$Certificate = Get-ChildItem -Path cert:CurrentUser\My | where {$_.Subject -eq "CN=QlikClient"} 
 Do {
         
     if($($qpsalive.value) -eq 'true') {Write-Host "Qlik Sense Proxy is alive"}
     else{
     Write-Host "Qlik Sense Proxy is NOT alive" -ForegroundColor Green
     start-sleep 5
-    Connect-Qlik -ComputerName https://$($FQDN):4242 -Username INTERNAL\sa_api
+    Connect-Qlik -ComputerName https://$($FQDN):4242 -Username INTERNAL\sa_api -Certificate $Certificate
     $qpsalive = Invoke-QlikGet -path https://$($FQDN):4243/qps/alive
     }
 }
