@@ -15,8 +15,6 @@
 #                       Configure authorization (security rules)
 
 # Configurable Variables
-# Staging location. Installer present in this directory. Logs also written here.
-$tempPath = 'C:\Temp\'
 # Use local storage for the Qlik Share. If true, the local share will be created (C:\QlikShare). If false, the share (with needed permissions for the service account must be created ahead of time)
 $localStorage = 'true'
 $sharePath = '\\whatever\share'
